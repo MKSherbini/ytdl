@@ -1,0 +1,174 @@
+#!/bin/bash
+# ============================================================================
+# YT-DLP WRAPPER SCRIPT - Enhanced with Dynamic Output Options
+# ============================================================================
+# Set your utils directory
+CONFIG_DIR="${YTDL_DIR}/configs"
+YTDLP_SCRIPT="${YTDL_DIR}/ytdlsrc/yt_dlp/__main__.py"
+# ============================================================================
+# MAIN DOWNLOAD FUNCTION
+# ============================================================================
+ytdl_download() {
+    local config_file="$1"
+    shift
+
+    # Initialize arrays for additional options
+    local extra_args=()
+    local playlist_mode=false
+    local subfolder_mode=false
+    local subfolder=""
+
+    # Parse arguments for --playlist and --subfolder only
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+        --playlist)
+            playlist_mode=true
+            shift
+            ;;
+        --subfolder)
+            subfolder_mode=true
+
+            if [[ -n "$2" && "$2" != -* && "$2" != http* ]]; then
+                subfolder="$2"
+                shift 2
+            else
+                shift
+            fi
+            ;;
+        *)
+            # Pass through everything else unchanged
+            extra_args+=("$1")
+            shift
+            ;;
+        esac
+    done
+
+    if [[ ! -f "${CONFIG_DIR}/${config_file}" ]]; then
+        echo "Error: Config file '${config_file}' not found in ${CONFIG_DIR}"
+        return 1
+    fi
+
+    # Build output template based on options
+    local output_template=""
+
+    if [[ "$playlist_mode" == true ]]; then
+        output_template="%(playlist_index)02d. %(title)s.%(ext)s"
+    else
+        output_template="%(title)s.%(ext)s"
+    fi
+
+    if [[ "$subfolder_mode" == true ]]; then
+        output_template="%(playlist_title,title)s/${output_template}"
+    fi
+
+    if [[ -n "$subfolder" ]]; then
+        output_template="${subfolder}/${output_template}"
+    fi
+
+    echo "Using config: ${config_file}"
+    if [[ "$playlist_mode" == true ]]; then
+        echo "Playlist mode: Enabled (numbered format)"
+    fi
+    if [[ "$subfolder_mode" == true ]]; then
+        echo "Subfolder mode: Enabled (separate folders)"
+    fi
+    if [[ -n "$subfolder" ]]; then
+        echo "Subfolder Prefix: ${subfolder}"
+    fi
+    echo "Downloading with args: ${extra_args[*]}"
+
+    # Build the command
+    local cmd_args=("${YTDLP_SCRIPT}")
+    cmd_args+=("--config-location" "${CONFIG_DIR}/${config_file}")
+
+    if [[ -n "$output_template" ]]; then
+        cmd_args+=("--output" "$output_template")
+    fi
+
+    # Add all remaining arguments
+    cmd_args+=("${extra_args[@]}")
+
+    # Execute the command
+    python3 "${cmd_args[@]}"
+
+    echo "Press any key to continue..."
+    read -n 1 -s
+}
+
+# ============================================================================
+# CLI HANDLER
+# ============================================================================
+show_help() {
+    echo "Usage: $(basename "$0") [command] <url> [options]"
+    echo ""
+    echo "Commands:"
+    echo "  audio           Audio (Opus, High Quality)"
+    echo "  audio-hq        Audio (FLAC, Archival Quality)"
+    echo "  audio-small     Audio (Opus, Small Size)"
+    echo "  video           Video (1080p, Good Quality)"
+    echo "  video-hq        Video (High Quality)"
+    echo "  video-small     Video (Small Size)"
+    echo "  archive         Archive Everything"
+    echo "  help, -h, --help Show this help"
+    echo ""
+    echo "Dynamic Output Options:"
+    echo "  --playlist      Use numbered playlist format (01 - Title.ext)"
+    echo "  --subfolder <name>  Save files to specified subfolder"
+    echo ""
+    echo "Examples:"
+    echo "  $(basename "$0") audio 'https://youtube.com/watch?v=...'"
+    echo "  $(basename "$0") video-hq 'https://youtube.com/playlist?list=...' --playlist"
+    echo "  $(basename "$0") audio 'https://youtube.com/watch?v=...' --subfolder 'My Music'"
+    echo "  $(basename "$0") video 'https://youtube.com/playlist?list=...' --playlist --subfolder 'Playlists'"
+    echo "  $(basename "$0") help"
+    echo ""
+    echo "Output Format Examples:"
+    echo "  Default:        Title.ext"
+    echo "  --playlist:     01 - Title.ext, 02 - Title.ext, ..."
+    echo "  --subfolder:    subfolder/Title.ext"
+    echo "  Both:           subfolder/01 - Title.ext"
+}
+
+# If no arguments, show help
+if [[ $# -eq 0 ]]; then
+    show_help
+    exit 0
+fi
+
+case "$1" in
+audio)
+    shift
+    ytdl_download "audio.conf" "$@"
+    ;;
+audio-hq)
+    shift
+    ytdl_download "audio-hq.conf" "$@"
+    ;;
+audio-small)
+    shift
+    ytdl_download "audio-small.conf" "$@"
+    ;;
+video)
+    shift
+    ytdl_download "video.conf" "$@"
+    ;;
+video-hq)
+    shift
+    ytdl_download "video-hq.conf" "$@"
+    ;;
+video-small)
+    shift
+    ytdl_download "video-small.conf" "$@"
+    ;;
+archive)
+    shift
+    ytdl_download "video-archive.conf" "$@"
+    ;;
+help | -h | --help) show_help ;;
+*)
+    echo "Error: Unknown command '$1'"
+    echo ""
+    show_help
+    exit 1
+    ;;
+esac
