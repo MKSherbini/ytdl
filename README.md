@@ -161,6 +161,8 @@ Download entire playlist as audio:
 ./scripts/ytdl audio "https://www.youtube.com/playlist?list=PLAYLIST_ID"
 ```
 
+You can also check the folder [examples](./examples/) for standard use cases
+
 ### Batch Processing
 
 For automated downloads, use the batch processing scripts:
